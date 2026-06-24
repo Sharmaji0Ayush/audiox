@@ -1,0 +1,695 @@
+<!doctype html>
+<html>
+    <head>
+        <title>AudioX - Listen In Sync</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+        <style>
+            /* CORE MINIMALIST THEME */
+            body {
+                background-color: #0b0b0f;
+                color: #f3f4f6;
+                font-family: "Plus Jakarta Sans", sans-serif;
+                margin: 0;
+                overflow-x: hidden;
+                min-height: 100vh;
+            }
+            * {
+                box-sizing: border-box;
+                transition: background-color 0.2s ease, transform 0.2s ease;
+            }
+
+            /* ELEGANT BACKGROUND LIGHTING */
+            #ambient-light {
+                position: fixed;
+                top: -10%;
+                left: -10%;
+                width: 120vw;
+                height: 120vh;
+                background: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                            radial-gradient(circle at 10% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 40%);
+                z-index: -1;
+                pointer-events: none;
+            }
+
+            /* GLASSMORPHISM LOGIN OVERLAY */
+            #login-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(11, 11, 15, 0.95);
+                z-index: 2000;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                gap: 20px;
+                backdrop-filter: blur(10px);
+            }
+            #login-overlay h2 {
+                font-weight: 700;
+                letter-spacing: -0.5px;
+                color: #ffffff;
+                margin-bottom: 5px;
+            }
+            #login-overlay input {
+                width: 80%;
+                max-width: 320px;
+            }
+
+            /* CONTAINER APPLICATION CONTENT */
+            .page {
+                display: none;
+                padding: 30px 24px 140px 24px;
+                min-height: 100vh;
+                max-width: 480px;
+                margin: 0 auto;
+            }
+            .page.active {
+                display: flex;
+                flex-direction: column;
+            }
+            h2 {
+                font-size: 24px;
+                font-weight: 700;
+                letter-spacing: -0.5px;
+                margin-top: 0;
+                margin-bottom: 20px;
+            }
+
+            /* UNIQUE MODAL TOGGLE */
+            .mode-switch {
+                display: flex;
+                background: rgba(255, 255, 255, 0.04);
+                padding: 4px;
+                border-radius: 30px;
+                margin: 0 auto 24px auto;
+                width: fit-content;
+                border: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            .mode-btn {
+                padding: 6px 18px;
+                border-radius: 20px;
+                border: none;
+                background: none;
+                color: #9ca3af;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+            }
+            .mode-btn.active {
+                background: #6366f1;
+                color: white;
+                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+            }
+
+            /* AUDIO TARGET RECONSTRUCTION */
+            #audio-engine {
+                display: none;
+            }
+
+            /* ART CANVAS */
+            #album-art-container {
+                width: 68vw;
+                height: 68vw;
+                max-width: 260px;
+                max-height: 260px;
+                margin: 10px auto 35px auto;
+                position: relative;
+            }
+            #album-art {
+                width: 100%;
+                height: 100%;
+                border-radius: 24px;
+                background-image: url("https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500");
+                background-size: cover;
+                background-position: center;
+                box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.4);
+                animation: smoothPulse 3s ease-in-out infinite alternate;
+                animation-play-state: paused;
+            }
+            @keyframes smoothPulse {
+                0% { transform: scale(1); filter: brightness(0.95); }
+                100% { transform: scale(1.03); filter: brightness(1.05); }
+            }
+
+            /* META DETAILS */
+            #song-info {
+                text-align: center;
+                margin-bottom: 25px;
+            }
+            #current-title {
+                font-size: 22px;
+                font-weight: 700;
+                letter-spacing: -0.3px;
+                margin-bottom: 6px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            #room-tag {
+                font-size: 11px;
+                color: #818cf8;
+                margin-bottom: 8px;
+                text-transform: uppercase;
+                font-weight: 700;
+                letter-spacing: 2px;
+                text-align: center;
+            }
+
+            /* SLEEK TIME & VOLUME CONTROLS */
+            input[type="range"] {
+                -webkit-appearance: none;
+                width: 100%;
+                height: 4px;
+                background: rgba(255, 255, 255, 0.08);
+                border-radius: 10px;
+                outline: none;
+                cursor: pointer;
+            }
+            input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 12px;
+                height: 12px;
+                background: #ffffff;
+                border-radius: 50%;
+                box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+                cursor: pointer;
+            }
+
+            .timeline-container {
+                width: 100%;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                margin-bottom: 25px;
+            }
+            .time-label {
+                font-size: 11px;
+                color: #6b7280;
+                width: 35px;
+                font-variant-numeric: tabular-nums;
+            }
+            .volume-container {
+                width: 60%;
+                margin: 25px auto 0 auto;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+            }
+            .volume-icon { color: #4b5563; font-size: 13px; }
+
+            /* MINIMAL AUDIO CONTROL MATRIX */
+            .controls {
+                display: flex;
+                justify-content: center;
+                gap: 24px;
+                align-items: center;
+            }
+            .ctrl-btn {
+                background: none;
+                border: none;
+                color: #9ca3af;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .ctrl-btn:hover { color: #ffffff; }
+            .btn-main {
+                width: 64px;
+                height: 64px;
+                background: #ffffff;
+                color: #0b0b0f;
+                border-radius: 50%;
+                font-size: 22px;
+                box-shadow: 0 10px 25px rgba(255, 255, 255, 0.15);
+            }
+            .btn-main:hover {
+                transform: scale(1.05);
+                background: #f3f4f6;
+            }
+            .btn-sec { font-size: 20px; }
+
+            /* INPUT TEXT FIELDS & BUTTONS */
+            input[type="text"] {
+                width: 100%;
+                padding: 14px 18px;
+                background: rgba(255, 255, 255, 0.04);
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                color: white;
+                border-radius: 16px;
+                font-size: 15px;
+                font-family: inherit;
+                outline: none;
+            }
+            input[type="text"]:focus {
+                border-color: #6366f1;
+                background: rgba(255, 255, 255, 0.07);
+            }
+            .btn {
+                width: 100%;
+                padding: 14px;
+                background: #6366f1;
+                color: white;
+                border: none;
+                border-radius: 16px;
+                font-weight: 600;
+                font-size: 15px;
+                font-family: inherit;
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(99, 102, 241, 0.25);
+            }
+            .btn:hover { background: #4f46e5; }
+
+            /* SEARCH / QUEUE ITEM BLOCKS */
+            .result-item {
+                display: flex;
+                align-items: center;
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.04);
+                margin-top: 12px;
+                padding: 12px;
+                border-radius: 16px;
+            }
+            .result-item img {
+                width: 48px;
+                height: 48px;
+                border-radius: 10px;
+                margin-right: 16px;
+                object-fit: cover;
+            }
+            .result-info {
+                flex-grow: 1;
+                overflow: hidden;
+            }
+            .result-info div {
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .add-btn {
+                background: rgba(255, 255, 255, 0.06);
+                border: none;
+                color: white;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-weight: bold;
+            }
+            .add-btn:hover { background: #6366f1; }
+
+            /* CHAT MATRIX PANEL */
+            #chat-box {
+                flex-grow: 1;
+                overflow-y: auto;
+                background: rgba(255, 255, 255, 0.02);
+                border: 1px solid rgba(255, 255, 255, 0.04);
+                padding: 16px;
+                border-radius: 16px;
+                height: 52vh;
+                margin-bottom: 12px;
+            }
+            .msg {
+                margin-bottom: 10px;
+                font-size: 14px;
+                line-height: 1.5;
+            }
+            .msg b { color: #818cf8; }
+
+            /* FLOATING ISLAND NAVIGATION MENU */
+            .nav {
+                display: flex;
+                justify-content: space-around;
+                background: rgba(15, 15, 22, 0.7);
+                backdrop-filter: blur(20px);
+                padding: 10px;
+                position: fixed;
+                bottom: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: calc(100% - 48px);
+                max-width: 400px;
+                border-radius: 28px;
+                border: 1px solid rgba(255, 255, 255, 0.06);
+                box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8);
+                z-index: 1000;
+            }
+            .nav button {
+                background: none;
+                border: none;
+                color: #4b5563;
+                font-size: 18px;
+                padding: 12px;
+                border-radius: 20px;
+                cursor: pointer;
+                width: 50px;
+                height: 50px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .nav button.active {
+                color: #6366f1;
+                background: rgba(99, 102, 241, 0.1);
+            }
+        </style>
+    </head>
+    <body>
+        <div id="ambient-light"></div>
+
+        <div id="login-overlay">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <h2>AudioX</h2>
+                <p style="color: #6b7280; font-size: 14px; margin: 0;">Stream music together in background sync</p>
+            </div>
+            <input type="text" id="usernameInput" placeholder="Your Name" />
+            <input type="text" id="roomInput" value="PARTY" placeholder="Room Code (e.g. PARTY)" style="margin-top: 4px;" />
+            <button class="btn" style="width: 80%; margin-top: 10px;" onclick="joinRoom()">Join Room</button>
+        </div>
+
+        <div id="page-player" class="page active">
+            <div id="room-tag">
+                Room &bull; <span id="room-name-display">...</span>
+            </div>
+
+            <audio id="audio-engine" preload="auto" crossorigin="anonymous"></audio>
+            <div id="album-art-container"><div id="album-art"></div></div>
+
+            <div id="song-info">
+                <div id="current-title">Waiting for DJ...</div>
+                <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">
+                    Added by: <span id="added-by" style="color: #9ca3af;">System</span>
+                </div>
+            </div>
+
+            <div class="timeline-container">
+                <span class="time-label" id="time-current">0:00</span>
+                <input type="range" id="seek-bar" value="0" min="0" max="100" onchange="seekSong()" oninput="isDragging=true" />
+                <span class="time-label" id="time-total">0:00</span>
+            </div>
+
+            <div class="controls">
+                <button class="ctrl-btn btn-sec" onclick="clearCurrentSong()">
+                    <i class="fa-solid fa-backward-step"></i>
+                </button>
+                <button class="ctrl-btn btn-main" onclick="togglePlay()">
+                    <i id="play-icon" class="fa fa-play" style="margin-left: 2px;"></i>
+                </button>
+                <button class="ctrl-btn btn-sec" onclick="popQueue()">
+                    <i class="fa-solid fa-forward-step"></i>
+                </button>
+            </div>
+
+            <div class="volume-container">
+                <i class="fa fa-volume-off volume-icon"></i>
+                <input type="range" id="volume-slider" min="0" max="100" value="100" oninput="changeVolume()" />
+                <i class="fa fa-volume-up volume-icon" style="color: #9ca3af"></i>
+            </div>
+        </div>
+
+        <div id="page-search" class="page">
+            <h2>Search Open Networks</h2>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="searchQuery" placeholder="Search direct tracks on Audius..." />
+                <button class="btn" style="width: auto; padding: 0 24px;" onclick="searchTracks()">Find</button>
+            </div>
+            <div id="search-results" style="margin-top: 15px;"></div>
+        </div>
+
+        <div id="page-queue" class="page">
+            <h2>Upcoming Queue</h2>
+            <div id="queue-list"></div>
+        </div>
+
+        <div id="page-chat" class="page">
+            <h2>Room Chat</h2>
+            <div id="chat-box"></div>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="chatInput" placeholder="Write a message..." />
+                <button class="btn" style="width: auto; padding: 0 20px;" onclick="sendChat()"><i class="fa fa-paper-plane"></i></button>
+            </div>
+        </div>
+
+        <div class="nav">
+            <button onclick="switchTab('player', this)" class="active"><i class="fa fa-music"></i></button>
+            <button onclick="switchTab('search', this)"><i class="fa fa-search"></i></button>
+            <button onclick="switchTab('queue', this)"><i class="fa fa-list"></i></button>
+            <button onclick="switchTab('chat', this)"><i class="fa fa-comment"></i></button>
+        </div>
+
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script>
+            // TODO: REPLACE THESE CONTEXTS WITH YOUR ACTUAL SUPABASE CREDENTIALS FOUND IN PROJECT SETTINGS
+            const SUPABASE_URL = "https://your-project-id.supabase.co";
+            const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.your-key-here";
+            
+            const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            const AUDIUS_API = "https://discoveryprovider.audius.co/v1";
+
+            var audioEngine = document.getElementById("audio-engine");
+            var myName = "", myRoom = "", isDragging = false;
+
+            // NATIVE SYSTEM CAPTURE SHORTCUT KEYS
+            document.addEventListener("keydown", (e) => {
+                const active = document.activeElement;
+                const isInput = active.tagName === "INPUT";
+                if (e.code === "Space" && !isInput) { e.preventDefault(); togglePlay(); }
+                if (e.code === "Enter") {
+                    if (active.id === "searchQuery") searchTracks();
+                    else if (active.id === "chatInput") sendChat();
+                    else if (document.getElementById("login-overlay").style.display !== "none") joinRoom();
+                }
+            });
+
+            // BROWSER LOCK SCREEN MANAGEMENT (BACKGROUND ENGINE CONTROLS)
+            function updateMediaSession(title, artist, artworkUrl) {
+                if ('mediaSession' in navigator) {
+                    navigator.mediaSession.metadata = new MediaMetadata({
+                        title: title,
+                        artist: artist || 'AudioX Server',
+                        artwork: [{ src: artworkUrl, sizes: '300x300', type: 'image/jpeg' }]
+                    });
+                    navigator.mediaSession.setActionHandler('play', () => togglePlay());
+                    navigator.mediaSession.setActionHandler('pause', () => togglePlay());
+                    navigator.mediaSession.setActionHandler('nexttrack', () => popQueue());
+                }
+            }
+
+            async function joinRoom() {
+                var u = document.getElementById("usernameInput").value.trim();
+                var r = document.getElementById("roomInput").value.trim().toUpperCase();
+                if (!u || !r) return alert("Please fill out both details to connect.");
+                
+                myName = u; myRoom = r;
+                document.getElementById("login-overlay").style.display = "none";
+                document.getElementById("room-name-display").innerText = r;
+
+                // Create room row if it doesn't already exist
+                await _supabase.from('rooms').insert({ room_code: r }).onConflict('room_code').ignore();
+
+                // Fetch current states immediately
+                syncInitialRoomState();
+                fetchQueue();
+                fetchChatHistory();
+
+                // INITIALIZE SUPABASE INSTANT REALTIME PIPELINES
+                _supabase.channel(`room:${r}`)
+                    .on('postgres_changes', { event: 'UPDATE', filter: `room_code=eq.${r}`, schema: 'public', table: 'rooms' }, payload => {
+                        processPlaybackSync(payload.new);
+                    })
+                    .on('postgres_changes', { event: '*', filter: `room_code=eq.${r}`, schema: 'public', table: 'queue' }, () => {
+                        fetchQueue();
+                    })
+                    .on('postgres_changes', { event: 'INSERT', filter: `room_code=eq.${r}`, schema: 'public', table: 'messages' }, payload => {
+                        renderSingleMessage(payload.new);
+                    })
+                    .subscribe();
+            }
+
+            async function syncInitialRoomState() {
+                let { data } = await _supabase.from('rooms').select('*').eq('room_code', myRoom).single();
+                if (data) processPlaybackSync(data);
+            }
+
+            function processPlaybackSync(room) {
+                document.getElementById("current-title").innerText = room.current_title;
+                document.getElementById("added-by").innerText = room.added_by;
+                if (room.current_thumbnail) {
+                    document.getElementById("album-art").style.backgroundImage = `url('${room.current_thumbnail}')`;
+                }
+
+                if (room.current_stream_url) {
+                    if (audioEngine.src !== room.current_stream_url) {
+                        audioEngine.src = room.current_stream_url;
+                        audioEngine.currentTime = room.seek_time;
+                    }
+                    
+                    // Validate delta time variance
+                    if (Math.abs(audioEngine.currentTime - room.seek_time) > 2.0) {
+                        audioEngine.currentTime = room.seek_time;
+                    }
+
+                    if (room.is_playing) {
+                        audioEngine.play().catch(() => console.log("Interactivity required."));
+                        updatePlayIcons(true);
+                    } else {
+                        audioEngine.pause();
+                        updatePlayIcons(false);
+                    }
+                    updateMediaSession(room.current_title, room.added_by, room.current_thumbnail);
+                }
+            }
+
+            async function togglePlay() {
+                let { data: room } = await _supabase.from('rooms').select('is_playing').eq('room_code', myRoom).single();
+                await _supabase.from('rooms').update({ 
+                    is_playing: !room.is_playing,
+                    seek_time: audioEngine.currentTime 
+                }).eq('room_code', myRoom);
+            }
+
+            async function seekSong() {
+                var slider = document.getElementById("seek-bar");
+                await _supabase.from('rooms').update({ seek_time: parseFloat(slider.value) }).eq('room_code', myRoom);
+                isDragging = false;
+            }
+
+            function changeVolume() {
+                audioEngine.volume = document.getElementById("volume-slider").value / 100;
+            }
+
+            // Background-safe audio element checker loops
+            setInterval(async () => {
+                if (audioEngine && !audioEngine.paused && !isDragging) {
+                    var current = audioEngine.currentTime;
+                    var duration = audioEngine.duration || 0;
+                    if (duration > 0) {
+                        document.getElementById("seek-bar").max = duration;
+                        document.getElementById("seek-bar").value = current;
+                        document.getElementById("time-current").innerText = formatTime(current);
+                        document.getElementById("time-total").innerText = formatTime(duration);
+                    }
+                    
+                    // Master user updates central seek point iteratively
+                    if (document.getElementById("added-by").innerText === myName) {
+                        await _supabase.from('rooms').update({ seek_time: current }).eq('room_code', myRoom);
+                    }
+                }
+            }, 1000);
+
+            audioEngine.onended = () => { popQueue(); };
+
+            function formatTime(s) {
+                var m = Math.floor(s / 60); var sec = Math.floor(s % 60);
+                return m + ":" + (sec < 10 ? "0" : "") + sec;
+            }
+
+            function updatePlayIcons(playing) {
+                const icon = document.getElementById("play-icon");
+                const art = document.getElementById("album-art");
+                icon.className = playing ? "fa fa-pause" : "fa fa-play";
+                art.style.animationPlayState = playing ? "running" : "paused";
+            }
+
+            // OPEN DECENTRALIZED API STREAM QUERIES (FREE BACKGROUND SOUNDBANKS)
+            function searchTracks() {
+                const q = document.getElementById("searchQuery").value;
+                const div = document.getElementById("search-results");
+                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching...</p>";
+                
+                fetch(`${AUDIUS_API}/tracks/search?query=${encodeURIComponent(q)}&app_name=AUDIOX`)
+                    .then(res => res.json())
+                    .then(res => {
+                        const tracks = res.data || []; div.innerHTML = "";
+                        tracks.slice(0, 6).forEach(t => {
+                            const stream = `${AUDIUS_API}/tracks/${t.id}/stream?app_name=AUDIOX`;
+                            const img = t.artwork ? t.artwork['150x150'] : 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
+                            div.innerHTML += `
+                            <div class="result-item">
+                                <img src="${img}">
+                                <div class="result-info"><div style="font-weight:600;font-size:14px;">${t.title}</div></div>
+                                <button class="add-btn" onclick="addTrackToQueue('${stream}', '${t.title.replace(/'/g, "")}', '${img}')">+</button>
+                            </div>`;
+                        });
+                    });
+            }
+
+            async function addTrackToQueue(url, title, thumb) {
+                await _supabase.from('queue').insert({ room_code: myRoom, title: title, stream_url: url, thumbnail: thumb, requested_by: myName });
+                alert("Queued tracks linked successfully!");
+                switchTab("queue", document.querySelectorAll(".nav button")[2]);
+            }
+
+            async function fetchQueue() {
+                let { data } = await _supabase.from('queue').select('*').eq('room_code', myRoom).order('created_at', { ascending: true });
+                const div = document.getElementById("queue-list");
+                div.innerHTML = data.length ? "" : "<p style='text-align:center;color:#4b5563;font-size:14px;margin-top:20px;'>The queue is empty.</p>";
+                data.forEach(i => {
+                    div.innerHTML += `
+                    <div class="result-item" style="border-left: 2px solid #6366f1;">
+                        <div class="result-info">
+                            <div style="font-weight:500;font-size:14px;">${i.title}</div>
+                            <div style="font-size:11px;color:#818cf8;margin-top:2px;">Requested by ${i.requested_by}</div>
+                        </div>
+                    </div>`;
+                });
+            }
+
+            async function popQueue() {
+                let { data } = await _supabase.from('queue').select('*').eq('room_code', myRoom).order('created_at', { ascending: true }).limit(1);
+                if (data && data.length > 0) {
+                    const next = data[0];
+                    await _supabase.from('rooms').update({
+                        current_title: next.title,
+                        current_stream_url: next.stream_url,
+                        current_thumbnail: next.thumbnail,
+                        added_by: next.requested_by,
+                        is_playing: true,
+                        seek_time: 0.0
+                    }).eq('room_code', myRoom);
+                    await _supabase.from('queue').delete().eq('id', next.id);
+                } else {
+                    clearCurrentSong();
+                }
+            }
+
+            async function clearCurrentSong() {
+                await _supabase.from('rooms').update({ current_title: "Waiting for DJ...", current_stream_url: null, is_playing: false, seek_time: 0.0, added_by: 'System' }).eq('room_code', myRoom);
+            }
+
+            async function sendChat() {
+                const i = document.getElementById("chatInput");
+                if (!i.value) return;
+                await _supabase.from('messages').insert({ room_code: myRoom, username: myName, message_text: i.value });
+                i.value = "";
+            }
+
+            async function fetchChatHistory() {
+                let { data } = await _supabase.from('messages').select('*').eq('room_code', myRoom).order('created_at', { ascending: true }).limit(50);
+                document.getElementById("chat-box").innerHTML = "";
+                if (data) data.forEach(m => renderSingleMessage(m));
+            }
+
+            function renderSingleMessage(m) {
+                const b = document.getElementById("chat-box");
+                b.innerHTML += `<div class="msg"><b>${m.username}:</b> ${m.message_text}</div>`;
+                b.scrollTop = b.scrollHeight;
+            }
+
+            function switchTab(t, btn) {
+                document.querySelectorAll(".page").forEach((p) => p.classList.remove("active"));
+                document.getElementById("page-" + t).classList.add("active");
+                document.querySelectorAll(".nav button").forEach((b) => b.classList.remove("active"));
+                if (btn) btn.classList.add("active");
+            }
+        </script>
+    </body>
+</html>
