@@ -447,17 +447,19 @@
 
         <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
         <script>
-            // TODO: REPLACE THESE CONTEXTS WITH YOUR ACTUAL SUPABASE CREDENTIALS FOUND IN PROJECT SETTINGS
-            const SUPABASE_URL = "https://dizwcmqkywfcranpvxhk.supabase.co/rest/v1/";
+            // CORRECTED BASE URL (Stripped /rest/v1/ so Realtime and Database connections work perfectly)
+            const SUPABASE_URL = "https://dizwcmqkywfcranpvxhk.supabase.co";
             const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpendjbXFreXdmY3JhbnB2eGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTczNDgsImV4cCI6MjA5Nzg5MzM0OH0.ZOiSiNv7KjhlfFOcCPfmksnEkyIfFSkVTbF1sVW-mdEe";
             
             const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            const AUDIUS_API = "https://discoveryprovider.audius.co/v1";
+            
+            // STABLE PUBLIC AUDIO DATA LAYER (Jamendo global CDN endpoint)
+            const JAMENDO_CLIENT_ID = "56d30c55"; 
 
             var audioEngine = document.getElementById("audio-engine");
             var myName = "", myRoom = "", isDragging = false;
 
-            // NATIVE SYSTEM CAPTURE SHORTCUT KEYS
+            // NATIVE SHORTCUT EVENT LISTENERS
             document.addEventListener("keydown", (e) => {
                 const active = document.activeElement;
                 const isInput = active.tagName === "INPUT";
@@ -469,12 +471,12 @@
                 }
             });
 
-            // BROWSER LOCK SCREEN MANAGEMENT (BACKGROUND ENGINE CONTROLS)
+            // MOBILE LOCK SCREEN WIDGET SYSTEM (BACKGROUND CONTROLS)
             function updateMediaSession(title, artist, artworkUrl) {
                 if ('mediaSession' in navigator) {
                     navigator.mediaSession.metadata = new MediaMetadata({
                         title: title,
-                        artist: artist || 'AudioX Server',
+                        artist: artist || 'AudioX Stream',
                         artwork: [{ src: artworkUrl, sizes: '300x300', type: 'image/jpeg' }]
                     });
                     navigator.mediaSession.setActionHandler('play', () => togglePlay());
@@ -492,15 +494,14 @@
                 document.getElementById("login-overlay").style.display = "none";
                 document.getElementById("room-name-display").innerText = r;
 
-                // Create room row if it doesn't already exist
+                // Create a room configuration entry safely if missing
                 await _supabase.from('rooms').insert({ room_code: r }).onConflict('room_code').ignore();
 
-                // Fetch current states immediately
                 syncInitialRoomState();
                 fetchQueue();
                 fetchChatHistory();
 
-                // INITIALIZE SUPABASE INSTANT REALTIME PIPELINES
+                // OPEN THE LIVE REALTIME DATA CHANNELS
                 _supabase.channel(`room:${r}`)
                     .on('postgres_changes', { event: 'UPDATE', filter: `room_code=eq.${r}`, schema: 'public', table: 'rooms' }, payload => {
                         processPlaybackSync(payload.new);
@@ -529,16 +530,16 @@
                 if (room.current_stream_url) {
                     if (audioEngine.src !== room.current_stream_url) {
                         audioEngine.src = room.current_stream_url;
+                        audioEngine.load();
                         audioEngine.currentTime = room.seek_time;
                     }
                     
-                    // Validate delta time variance
-                    if (Math.abs(audioEngine.currentTime - room.seek_time) > 2.0) {
+                    if (Math.abs(audioEngine.currentTime - room.seek_time) > 2.5) {
                         audioEngine.currentTime = room.seek_time;
                     }
 
                     if (room.is_playing) {
-                        audioEngine.play().catch(() => console.log("Interactivity required."));
+                        audioEngine.play().catch(() => console.log("Waiting for interface activation..."));
                         updatePlayIcons(true);
                     } else {
                         audioEngine.pause();
@@ -566,7 +567,7 @@
                 audioEngine.volume = document.getElementById("volume-slider").value / 100;
             }
 
-            // Background-safe audio element checker loops
+            // BACK END LOOP TRACKER TO KEEP TIMELINES UNIFIED
             setInterval(async () => {
                 if (audioEngine && !audioEngine.paused && !isDragging) {
                     var current = audioEngine.currentTime;
@@ -578,7 +579,6 @@
                         document.getElementById("time-total").innerText = formatTime(duration);
                     }
                     
-                    // Master user updates central seek point iteratively
                     if (document.getElementById("added-by").innerText === myName) {
                         await _supabase.from('rooms').update({ seek_time: current }).eq('room_code', myRoom);
                     }
@@ -599,32 +599,44 @@
                 art.style.animationPlayState = playing ? "running" : "paused";
             }
 
-            // OPEN DECENTRALIZED API STREAM QUERIES (FREE BACKGROUND SOUNDBANKS)
+            // SEARCH CAPTURE OVER STABLE CDN STREAM ENGINE
             function searchTracks() {
                 const q = document.getElementById("searchQuery").value;
                 const div = document.getElementById("search-results");
-                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching...</p>";
+                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching track libraries...</p>";
                 
-                fetch(`${AUDIUS_API}/tracks/search?query=${encodeURIComponent(q)}&app_name=AUDIOX`)
+                fetch(`https://api.jamendo.com/v3.0/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=6&search=${encodeURIComponent(q)}&include=musicinfo`)
                     .then(res => res.json())
                     .then(res => {
-                        const tracks = res.data || []; div.innerHTML = "";
-                        tracks.slice(0, 6).forEach(t => {
-                            const stream = `${AUDIUS_API}/tracks/${t.id}/stream?app_name=AUDIOX`;
-                            const img = t.artwork ? t.artwork['150x150'] : 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
+                        const tracks = res.results || []; div.innerHTML = "";
+                        if (!tracks.length) {
+                            div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>No clear matches found.</p>";
+                            return;
+                        }
+                        tracks.forEach(t => {
+                            const stream = t.audio;
+                            const img = t.image || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
+                            const titleClean = t.name.replace(/'/g, "").replace(/"/g, "");
                             div.innerHTML += `
                             <div class="result-item">
                                 <img src="${img}">
-                                <div class="result-info"><div style="font-weight:600;font-size:14px;">${t.title}</div></div>
-                                <button class="add-btn" onclick="addTrackToQueue('${stream}', '${t.title.replace(/'/g, "")}', '${img}')">+</button>
+                                <div class="result-info"><div style="font-weight:600;font-size:14px;">${titleClean}</div></div>
+                                <button class="add-btn" onclick="addTrackToQueue('${stream}', '${titleClean}', '${img}')">+</button>
                             </div>`;
                         });
+                    }).catch(() => {
+                        div.innerHTML = "<p style='text-align:center;color:#ef4444;'>Search platform connection timed out.</p>";
                     });
             }
 
             async function addTrackToQueue(url, title, thumb) {
                 await _supabase.from('queue').insert({ room_code: myRoom, title: title, stream_url: url, thumbnail: thumb, requested_by: myName });
-                alert("Queued tracks linked successfully!");
+                alert("Track queued!");
+                
+                let { data: room } = await _supabase.from('rooms').select('current_stream_url').eq('room_code', myRoom).single();
+                if (!room || !room.current_stream_url) {
+                    popQueue();
+                }
                 switchTab("queue", document.querySelectorAll(".nav button")[2]);
             }
 
