@@ -447,19 +447,15 @@
 
         <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
         <script>
-            // CORRECTED BASE URL (Stripped /rest/v1/ so Realtime and Database connections work perfectly)
             const SUPABASE_URL = "https://dizwcmqkywfcranpvxhk.supabase.co";
             const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpendjbXFreXdmY3JhbnB2eGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTczNDgsImV4cCI6MjA5Nzg5MzM0OH0.ZOiSiNv7KjhlfFOcCPfmksnEkyIfFSkVTbF1sVW-mdEe";
             
             const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            
-            // STABLE PUBLIC AUDIO DATA LAYER (Jamendo global CDN endpoint)
             const JAMENDO_CLIENT_ID = "56d30c55"; 
 
             var audioEngine = document.getElementById("audio-engine");
             var myName = "", myRoom = "", isDragging = false;
 
-            // NATIVE SHORTCUT EVENT LISTENERS
             document.addEventListener("keydown", (e) => {
                 const active = document.activeElement;
                 const isInput = active.tagName === "INPUT";
@@ -471,7 +467,6 @@
                 }
             });
 
-            // MOBILE LOCK SCREEN WIDGET SYSTEM (BACKGROUND CONTROLS)
             function updateMediaSession(title, artist, artworkUrl) {
                 if ('mediaSession' in navigator) {
                     navigator.mediaSession.metadata = new MediaMetadata({
@@ -494,14 +489,17 @@
                 document.getElementById("login-overlay").style.display = "none";
                 document.getElementById("room-name-display").innerText = r;
 
-                // Create a room configuration entry safely if missing
-                await _supabase.from('rooms').insert({ room_code: r }).onConflict('room_code').ignore();
+                // FIXED: Native upsert method syntax to handle room creation safely without throwing errors
+                try {
+                    await _supabase.from('rooms').upsert({ room_code: r }, { onConflict: 'room_code' });
+                } catch(err) {
+                    console.log("Room initialized or handled safely.");
+                }
 
                 syncInitialRoomState();
                 fetchQueue();
                 fetchChatHistory();
 
-                // OPEN THE LIVE REALTIME DATA CHANNELS
                 _supabase.channel(`room:${r}`)
                     .on('postgres_changes', { event: 'UPDATE', filter: `room_code=eq.${r}`, schema: 'public', table: 'rooms' }, payload => {
                         processPlaybackSync(payload.new);
@@ -516,13 +514,13 @@
             }
 
             async function syncInitialRoomState() {
-                let { data } = await _supabase.from('rooms').select('*').eq('room_code', myRoom).single();
+                let { data } = await _supabase.from('rooms').select('*').eq('room_code', myRoom).maybeSingle();
                 if (data) processPlaybackSync(data);
             }
 
             function processPlaybackSync(room) {
-                document.getElementById("current-title").innerText = room.current_title;
-                document.getElementById("added-by").innerText = room.added_by;
+                document.getElementById("current-title").innerText = room.current_title || "Waiting for DJ...";
+                document.getElementById("added-by").innerText = room.added_by || "System";
                 if (room.current_thumbnail) {
                     document.getElementById("album-art").style.backgroundImage = `url('${room.current_thumbnail}')`;
                 }
@@ -531,7 +529,7 @@
                     if (audioEngine.src !== room.current_stream_url) {
                         audioEngine.src = room.current_stream_url;
                         audioEngine.load();
-                        audioEngine.currentTime = room.seek_time;
+                        audioEngine.currentTime = room.seek_time || 0;
                     }
                     
                     if (Math.abs(audioEngine.currentTime - room.seek_time) > 2.5) {
@@ -539,7 +537,7 @@
                     }
 
                     if (room.is_playing) {
-                        audioEngine.play().catch(() => console.log("Waiting for interface activation..."));
+                        audioEngine.play().catch(() => console.log("Tap screen to interact with playback engine context."));
                         updatePlayIcons(true);
                     } else {
                         audioEngine.pause();
@@ -551,6 +549,7 @@
 
             async function togglePlay() {
                 let { data: room } = await _supabase.from('rooms').select('is_playing').eq('room_code', myRoom).single();
+                if(!room) return;
                 await _supabase.from('rooms').update({ 
                     is_playing: !room.is_playing,
                     seek_time: audioEngine.currentTime 
@@ -567,7 +566,6 @@
                 audioEngine.volume = document.getElementById("volume-slider").value / 100;
             }
 
-            // BACK END LOOP TRACKER TO KEEP TIMELINES UNIFIED
             setInterval(async () => {
                 if (audioEngine && !audioEngine.paused && !isDragging) {
                     var current = audioEngine.currentTime;
@@ -599,7 +597,6 @@
                 art.style.animationPlayState = playing ? "running" : "paused";
             }
 
-            // SEARCH CAPTURE OVER STABLE CDN STREAM ENGINE
             function searchTracks() {
                 const q = document.getElementById("searchQuery").value;
                 const div = document.getElementById("search-results");
@@ -633,7 +630,7 @@
                 await _supabase.from('queue').insert({ room_code: myRoom, title: title, stream_url: url, thumbnail: thumb, requested_by: myName });
                 alert("Track queued!");
                 
-                let { data: room } = await _supabase.from('rooms').select('current_stream_url').eq('room_code', myRoom).single();
+                let { data: room } = await _supabase.from('rooms').select('current_stream_url').eq('room_code', myRoom).maybeSingle();
                 if (!room || !room.current_stream_url) {
                     popQueue();
                 }
@@ -643,16 +640,18 @@
             async function fetchQueue() {
                 let { data } = await _supabase.from('queue').select('*').eq('room_code', myRoom).order('created_at', { ascending: true });
                 const div = document.getElementById("queue-list");
-                div.innerHTML = data.length ? "" : "<p style='text-align:center;color:#4b5563;font-size:14px;margin-top:20px;'>The queue is empty.</p>";
-                data.forEach(i => {
-                    div.innerHTML += `
-                    <div class="result-item" style="border-left: 2px solid #6366f1;">
-                        <div class="result-info">
-                            <div style="font-weight:500;font-size:14px;">${i.title}</div>
-                            <div style="font-size:11px;color:#818cf8;margin-top:2px;">Requested by ${i.requested_by}</div>
-                        </div>
-                    </div>`;
-                });
+                div.innerHTML = data && data.length ? "" : "<p style='text-align:center;color:#4b5563;font-size:14px;margin-top:20px;'>The queue is empty.</p>";
+                if(data) {
+                    data.forEach(i => {
+                        div.innerHTML += `
+                        <div class="result-item" style="border-left: 2px solid #6366f1;">
+                            <div class="result-info">
+                                <div style="font-weight:500;font-size:14px;">${i.title}</div>
+                                <div style="font-size:11px;color:#818cf8;margin-top:2px;">Requested by ${i.requested_by}</div>
+                            </div>
+                        </div>`;
+                    });
+                }
             }
 
             async function popQueue() {
