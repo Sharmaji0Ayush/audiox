@@ -445,15 +445,18 @@
             <button onclick="switchTab('chat', this)"><i class="fa fa-comment"></i></button>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="https://www.youtube.com/iframe_api"></script>
         <script>
             const SUPABASE_URL = "https://dizwcmqkywfcranpvxhk.supabase.co";
             const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpendjbXFreXdmY3JhbnB2eGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTczNDgsImV4cCI6MjA5Nzg5MzM0OH0.ZOiSiNv7KjhlfFOcCPfmksnEkyIfFSkVTbF1sVW-mdEe";
             
             const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            const JAMENDO_CLIENT_ID = "56d30c55"; 
+            
+            // Public open alternative YouTube API instance for free searching
+            const INVIDIOUS_SEARCH_API = "https://invidious.flokinet.to/api/v1/search";
 
-            var audioEngine = document.getElementById("audio-engine");
+            var player;
             var myName = "", myRoom = "", isDragging = false;
 
             document.addEventListener("keydown", (e) => {
@@ -467,17 +470,17 @@
                 }
             });
 
-            function updateMediaSession(title, artist, artworkUrl) {
-                if ('mediaSession' in navigator) {
-                    navigator.mediaSession.metadata = new MediaMetadata({
-                        title: title,
-                        artist: artist || 'AudioX Stream',
-                        artwork: [{ src: artworkUrl, sizes: '300x300', type: 'image/jpeg' }]
-                    });
-                    navigator.mediaSession.setActionHandler('play', () => togglePlay());
-                    navigator.mediaSession.setActionHandler('pause', () => togglePlay());
-                    navigator.mediaSession.setActionHandler('nexttrack', () => popQueue());
-                }
+            // Initialize YouTube Iframe Player
+            function onYouTubeIframeAPIReady() {
+                player = new YT.Player("album-art", { // Mounts directly inside your artwork container
+                    height: "100%", width: "100%", videoId: "",
+                    playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1 },
+                    events: { onStateChange: onPlayerStateChange },
+                });
+            }
+
+            function onPlayerStateChange(event) {
+                if (event.data == YT.PlayerState.ENDED) popQueue();
             }
 
             async function joinRoom() {
@@ -489,11 +492,10 @@
                 document.getElementById("login-overlay").style.display = "none";
                 document.getElementById("room-name-display").innerText = r;
 
-                // FIXED: Native upsert method syntax to handle room creation safely without throwing errors
                 try {
                     await _supabase.from('rooms').upsert({ room_code: r }, { onConflict: 'room_code' });
                 } catch(err) {
-                    console.log("Room initialized or handled safely.");
+                    console.log("Room initialization handled.");
                 }
 
                 syncInitialRoomState();
@@ -521,38 +523,37 @@
             function processPlaybackSync(room) {
                 document.getElementById("current-title").innerText = room.current_title || "Waiting for DJ...";
                 document.getElementById("added-by").innerText = room.added_by || "System";
-                if (room.current_thumbnail) {
-                    document.getElementById("album-art").style.backgroundImage = `url('${room.current_thumbnail}')`;
-                }
 
-                if (room.current_stream_url) {
-                    if (audioEngine.src !== room.current_stream_url) {
-                        audioEngine.src = room.current_stream_url;
-                        audioEngine.load();
-                        audioEngine.currentTime = room.seek_time || 0;
-                    }
+                if (room.current_stream_url) { // Holding the YouTube video ID
+                    const targetVideoId = room.current_stream_url;
                     
-                    if (Math.abs(audioEngine.currentTime - room.seek_time) > 2.5) {
-                        audioEngine.currentTime = room.seek_time;
-                    }
+                    if (player && player.loadVideoById) {
+                        if (player.getVideoData().video_id !== targetVideoId) {
+                            player.loadVideoById(targetVideoId, room.seek_time || 0);
+                        }
+                        
+                        if (Math.abs(player.getCurrentTime() - room.seek_time) > 2.5) {
+                            player.seekTo(room.seek_time);
+                        }
 
-                    if (room.is_playing) {
-                        audioEngine.play().catch(() => console.log("Tap screen to interact with playback engine context."));
-                        updatePlayIcons(true);
-                    } else {
-                        audioEngine.pause();
-                        updatePlayIcons(false);
+                        if (room.is_playing) {
+                            player.playVideo();
+                            updatePlayIcons(true);
+                        } else {
+                            player.pauseVideo();
+                            updatePlayIcons(false);
+                        }
                     }
-                    updateMediaSession(room.current_title, room.added_by, room.current_thumbnail);
                 }
             }
 
             async function togglePlay() {
+                if (!player || !player.getCurrentTime) return;
                 let { data: room } = await _supabase.from('rooms').select('is_playing').eq('room_code', myRoom).single();
                 if(!room) return;
                 await _supabase.from('rooms').update({ 
                     is_playing: !room.is_playing,
-                    seek_time: audioEngine.currentTime 
+                    seek_time: player.getCurrentTime()
                 }).eq('room_code', myRoom);
             }
 
@@ -563,13 +564,14 @@
             }
 
             function changeVolume() {
-                audioEngine.volume = document.getElementById("volume-slider").value / 100;
+                var vol = document.getElementById("volume-slider").value;
+                if (player && player.setVolume) player.setVolume(vol);
             }
 
             setInterval(async () => {
-                if (audioEngine && !audioEngine.paused && !isDragging) {
-                    var current = audioEngine.currentTime;
-                    var duration = audioEngine.duration || 0;
+                if (player && player.getCurrentTime && player.getPlayerState() === YT.PlayerState.PLAYING && !isDragging) {
+                    var current = player.getCurrentTime();
+                    var duration = player.getDuration() || 0;
                     if (duration > 0) {
                         document.getElementById("seek-bar").max = duration;
                         document.getElementById("seek-bar").value = current;
@@ -583,8 +585,6 @@
                 }
             }, 1000);
 
-            audioEngine.onended = () => { popQueue(); };
-
             function formatTime(s) {
                 var m = Math.floor(s / 60); var sec = Math.floor(s % 60);
                 return m + ":" + (sec < 10 ? "0" : "") + sec;
@@ -592,47 +592,41 @@
 
             function updatePlayIcons(playing) {
                 const icon = document.getElementById("play-icon");
-                const art = document.getElementById("album-art");
                 icon.className = playing ? "fa fa-pause" : "fa fa-play";
-                art.style.animationPlayState = playing ? "running" : "paused";
             }
 
+            // FREE OPEN YOUTUBE SEARCH METHOD VIA INVIDIOUS API INSTANCE
             function searchTracks() {
-    const q = document.getElementById("searchQuery").value;
-    const div = document.getElementById("search-results");
-    div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching track libraries...</p>";
-    
-    // Using an open CORS proxy to prevent the browser from blocking the API data fetch
-    const proxyUrl = "https://corsproxy.io/?";
-    const targetUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=6&search=${encodeURIComponent(q)}&include=musicinfo`;
-
-    fetch(proxyUrl + encodeURIComponent(targetUrl))
-        .then(res => res.json())
-        .then(res => {
-            const tracks = res.results || []; div.innerHTML = "";
-            if (!tracks.length) {
-                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>No clear matches found.</p>";
-                return;
+                const q = document.getElementById("searchQuery").value;
+                const div = document.getElementById("search-results");
+                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching YouTube networks...</p>";
+                
+                fetch(`${INVIDIOUS_SEARCH_API}?q=${encodeURIComponent(q)}&type=video`)
+                    .then(res => res.json())
+                    .then(videos => {
+                        div.innerHTML = "";
+                        if (!videos || !videos.length) {
+                            div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>No clear matches found.</p>";
+                            return;
+                        }
+                        videos.slice(0, 6).forEach(v => {
+                            const videoId = v.videoId;
+                            const img = (v.videoThumbnails && v.videoThumbnails[0]) ? v.videoThumbnails[0].url : 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
+                            const titleClean = v.title.replace(/'/g, "").replace(/"/g, "");
+                            div.innerHTML += `
+                            <div class="result-item">
+                                <img src="${img}">
+                                <div class="result-info"><div style="font-weight:600;font-size:14px;">${titleClean}</div></div>
+                                <button class="add-btn" onclick="addTrackToQueue('${videoId}', '${titleClean}', '${img}')">+</button>
+                            </div>`;
+                        });
+                    }).catch(() => {
+                        div.innerHTML = "<p style='text-align:center;color:#ef4444;'>Search platform connection timed out.</p>";
+                    });
             }
-            tracks.forEach(t => {
-                const stream = t.audio;
-                const img = t.image || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
-                const titleClean = t.name.replace(/'/g, "").replace(/"/g, "");
-                div.innerHTML += `
-                <div class="result-item">
-                    <img src="${img}">
-                    <div class="result-info"><div style="font-weight:600;font-size:14px;">${titleClean}</div></div>
-                    <button class="add-btn" onclick="addTrackToQueue('${stream}', '${titleClean}', '${img}')">+</button>
-                </div>`;
-            });
-        }).catch((err) => {
-            console.error("Search Error:", err);
-            div.innerHTML = "<p style='text-align:center;color:#ef4444;'>Search platform connection timed out.</p>";
-        });
-}
 
-            async function addTrackToQueue(url, title, thumb) {
-                await _supabase.from('queue').insert({ room_code: myRoom, title: title, stream_url: url, thumbnail: thumb, requested_by: myName });
+            async function addTrackToQueue(id, title, thumb) {
+                await _supabase.from('queue').insert({ room_code: myRoom, title: title, stream_url: id, thumbnail: thumb, requested_by: myName });
                 alert("Track queued!");
                 
                 let { data: room } = await _supabase.from('rooms').select('current_stream_url').eq('room_code', myRoom).maybeSingle();
