@@ -598,33 +598,38 @@
             }
 
             function searchTracks() {
-                const q = document.getElementById("searchQuery").value;
-                const div = document.getElementById("search-results");
-                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching track libraries...</p>";
-                
-                fetch(`https://api.jamendo.com/v3.0/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=6&search=${encodeURIComponent(q)}&include=musicinfo`)
-                    .then(res => res.json())
-                    .then(res => {
-                        const tracks = res.results || []; div.innerHTML = "";
-                        if (!tracks.length) {
-                            div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>No clear matches found.</p>";
-                            return;
-                        }
-                        tracks.forEach(t => {
-                            const stream = t.audio;
-                            const img = t.image || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
-                            const titleClean = t.name.replace(/'/g, "").replace(/"/g, "");
-                            div.innerHTML += `
-                            <div class="result-item">
-                                <img src="${img}">
-                                <div class="result-info"><div style="font-weight:600;font-size:14px;">${titleClean}</div></div>
-                                <button class="add-btn" onclick="addTrackToQueue('${stream}', '${titleClean}', '${img}')">+</button>
-                            </div>`;
-                        });
-                    }).catch(() => {
-                        div.innerHTML = "<p style='text-align:center;color:#ef4444;'>Search platform connection timed out.</p>";
-                    });
+    const q = document.getElementById("searchQuery").value;
+    const div = document.getElementById("search-results");
+    div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching track libraries...</p>";
+    
+    // Using an open CORS proxy to prevent the browser from blocking the API data fetch
+    const proxyUrl = "https://corsproxy.io/?";
+    const targetUrl = `https://api.jamendo.com/v3.0/tracks/?client_id=${JAMENDO_CLIENT_ID}&format=json&limit=6&search=${encodeURIComponent(q)}&include=musicinfo`;
+
+    fetch(proxyUrl + encodeURIComponent(targetUrl))
+        .then(res => res.json())
+        .then(res => {
+            const tracks = res.results || []; div.innerHTML = "";
+            if (!tracks.length) {
+                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>No clear matches found.</p>";
+                return;
             }
+            tracks.forEach(t => {
+                const stream = t.audio;
+                const img = t.image || 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
+                const titleClean = t.name.replace(/'/g, "").replace(/"/g, "");
+                div.innerHTML += `
+                <div class="result-item">
+                    <img src="${img}">
+                    <div class="result-info"><div style="font-weight:600;font-size:14px;">${titleClean}</div></div>
+                    <button class="add-btn" onclick="addTrackToQueue('${stream}', '${titleClean}', '${img}')">+</button>
+                </div>`;
+            });
+        }).catch((err) => {
+            console.error("Search Error:", err);
+            div.innerHTML = "<p style='text-align:center;color:#ef4444;'>Search platform connection timed out.</p>";
+        });
+}
 
             async function addTrackToQueue(url, title, thumb) {
                 await _supabase.from('queue').insert({ room_code: myRoom, title: title, stream_url: url, thumbnail: thumb, requested_by: myName });
