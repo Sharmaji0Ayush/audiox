@@ -1,441 +1,148 @@
 <!doctype html>
 <html>
     <head>
-        <title>AudioX - Listen In Sync</title>
+        <title>Social Jukebox Final</title>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 
         <style>
-            /* CORE MINIMALIST THEME */
-            body {
-                background-color: #0b0b0f;
-                color: #f3f4f6;
-                font-family: "Plus Jakarta Sans", sans-serif;
-                margin: 0;
-                overflow-x: hidden;
-                min-height: 100vh;
-            }
-            * {
-                box-sizing: border-box;
-                transition: background-color 0.2s ease, transform 0.2s ease;
-            }
+            /* BASE THEME */
+            body { background-color: #050505; color: white; font-family: "Segoe UI", sans-serif; margin: 0; overflow-x: hidden; }
+            * { box-sizing: border-box; }
 
-            /* ELEGANT BACKGROUND LIGHTING */
+            /* AMBIENT BACKGROUND */
             #ambient-light {
-                position: fixed;
-                top: -10%;
-                left: -10%;
-                width: 120vw;
-                height: 120vh;
-                background: radial-gradient(circle at 80% 20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-                            radial-gradient(circle at 10% 80%, rgba(168, 85, 247, 0.1) 0%, transparent 40%);
-                z-index: -1;
-                pointer-events: none;
+                position: fixed; top: 50%; left: 50%; width: 120vw; height: 120vw;
+                background: conic-gradient(from 180deg at 50% 50%, #ff0055 0deg, #000000 120deg, #00aaff 240deg, #ff0055 360deg);
+                filter: blur(90px) opacity(0.25); z-index: -1; transform: translate(-50%, -50%);
+                animation: rotateAmbient 25s linear infinite;
+            }
+            @keyframes rotateAmbient {
+                0% { transform: translate(-50%, -50%) rotate(0deg); }
+                100% { transform: translate(-50%, -50%) rotate(360deg); }
             }
 
-            /* GLASSMORPHISM LOGIN OVERLAY */
+            /* LOGIN OVERLAY */
             #login-overlay {
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(11, 11, 15, 0.95);
-                z-index: 2000;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                gap: 20px;
-                backdrop-filter: blur(10px);
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 2000;
+                display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px;
             }
-            #login-overlay h2 {
-                font-weight: 700;
-                letter-spacing: -0.5px;
-                color: #ffffff;
-                margin-bottom: 5px;
-            }
-            #login-overlay input {
-                width: 80%;
-                max-width: 320px;
-            }
+            #login-overlay input { width: 70%; max-width: 300px; text-align: center; }
 
-            /* CONTAINER APPLICATION CONTENT */
-            .page {
-                display: none;
-                padding: 30px 24px 140px 24px;
-                min-height: 100vh;
-                max-width: 480px;
-                margin: 0 auto;
-            }
-            .page.active {
-                display: flex;
-                flex-direction: column;
-            }
-            h2 {
-                font-size: 24px;
-                font-weight: 700;
-                letter-spacing: -0.5px;
-                margin-top: 0;
-                margin-bottom: 20px;
-            }
+            /* PAGES */
+            .page { display: none; padding: 20px; padding-bottom: 120px; min-height: 100vh; position: relative; }
+            .page.active { display: flex; flex-direction: column; }
 
-            /* UNIQUE MODAL TOGGLE */
+            /* MODE SWITCH */
             .mode-switch {
-                display: flex;
-                background: rgba(255, 255, 255, 0.04);
-                padding: 4px;
-                border-radius: 30px;
-                margin: 0 auto 24px auto;
-                width: fit-content;
-                border: 1px solid rgba(255, 255, 255, 0.05);
+                display: flex; background: rgba(255, 255, 255, 0.1); padding: 5px; border-radius: 20px; margin: 0 auto 15px auto; width: fit-content; backdrop-filter: blur(5px);
             }
-            .mode-btn {
-                padding: 6px 18px;
-                border-radius: 20px;
-                border: none;
-                background: none;
-                color: #9ca3af;
-                font-size: 13px;
-                font-weight: 600;
-                cursor: pointer;
-            }
-            .mode-btn.active {
-                background: #6366f1;
-                color: white;
-                box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-            }
+            .mode-btn { padding: 5px 15px; border-radius: 15px; border: none; background: none; color: #aaa; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+            .mode-btn.active { background: #ff0055; color: white; box-shadow: 0 2px 10px rgba(255, 0, 85, 0.4); }
 
-            /* AUDIO TARGET RECONSTRUCTION */
-            #audio-engine {
-                display: none;
-            }
-
-            /* ART CANVAS */
-            #album-art-container {
-                width: 68vw;
-                height: 68vw;
-                max-width: 260px;
-                max-height: 260px;
-                margin: 10px auto 35px auto;
-                position: relative;
-            }
+            /* VISUALS */
+            #video-container { width: 100%; padding-bottom: 56.25%; position: relative; background: #000; border-radius: 15px; overflow: hidden; margin-bottom: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); display: none; }
+            #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+            #album-art-container { width: 70vw; height: 70vw; max-width: 300px; max-height: 300px; margin: 10px auto 30px auto; position: relative; }
             #album-art {
-                width: 100%;
-                height: 100%;
-                border-radius: 24px;
-                background-image: url("https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500");
-                background-size: cover;
-                background-position: center;
-                box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.4);
-                animation: smoothPulse 3s ease-in-out infinite alternate;
-                animation-play-state: paused;
+                width: 100%; height: 100%; border-radius: 50%; background-image: url("https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExYjRkODRkODRkODRkODRkODRkODRkODRkODRkODRkODRkODRkODRkODRkOCZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/3o7abAHdYvZdBNnGZq/giphy.gif");
+                background-size: 100% 100%; background-position: center; border: 6px solid #111;
+                box-shadow: 0 0 15px #ff0055, 0 0 30px rgba(0, 170, 255, 0.6), inset 0 0 20px rgba(0, 0, 0, 0.8);
+                animation: spin 8s linear infinite, pulseGlow 2s ease-in-out infinite alternate; animation-play-state: paused;
             }
-            @keyframes smoothPulse {
-                0% { transform: scale(1); filter: brightness(0.95); }
-                100% { transform: scale(1.03); filter: brightness(1.05); }
-            }
+            @keyframes spin { 100% { transform: rotate(360deg); } }
+            @keyframes pulseGlow { 0% { scale: 1; filter: brightness(1); } 100% { scale: 1.02; filter: brightness(1.15); } }
 
-            /* META DETAILS */
-            #song-info {
-                text-align: center;
-                margin-bottom: 25px;
-            }
-            #current-title {
-                font-size: 22px;
-                font-weight: 700;
-                letter-spacing: -0.3px;
-                margin-bottom: 6px;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            #room-tag {
-                font-size: 11px;
-                color: #818cf8;
-                margin-bottom: 8px;
-                text-transform: uppercase;
-                font-weight: 700;
-                letter-spacing: 2px;
-                text-align: center;
-            }
+            /* INFO & SLIDERS */
+            #song-info { text-align: center; margin-bottom: 15px; text-shadow: 0 2px 5px rgba(0, 0, 0, 0.5); }
+            #current-title { font-size: 20px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            #room-tag { font-size: 12px; color: #ff0055; margin-bottom: 5px; text-transform: uppercase; font-weight: bold; text-align: center; letter-spacing: 1px; }
 
-            /* SLEEK TIME & VOLUME CONTROLS */
-            input[type="range"] {
-                -webkit-appearance: none;
-                width: 100%;
-                height: 4px;
-                background: rgba(255, 255, 255, 0.08);
-                border-radius: 10px;
-                outline: none;
-                cursor: pointer;
-            }
-            input[type="range"]::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                width: 12px;
-                height: 12px;
-                background: #ffffff;
-                border-radius: 50%;
-                box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-                cursor: pointer;
-            }
+            input[type="range"] { -webkit-appearance: none; width: 100%; height: 3px; background: rgba(255, 255, 255, 0.2); border-radius: 2px; outline: none; border: none; cursor: pointer; }
+            input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; background: #ff0055; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px #ff0055; }
 
-            .timeline-container {
-                width: 100%;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                margin-bottom: 25px;
-            }
-            .time-label {
-                font-size: 11px;
-                color: #6b7280;
-                width: 35px;
-                font-variant-numeric: tabular-nums;
-            }
-            .volume-container {
-                width: 60%;
-                margin: 25px auto 0 auto;
-                display: flex;
-                align-items: center;
-                gap: 12px;
-            }
-            .volume-icon { color: #4b5563; font-size: 13px; }
+            .timeline-container { width: 100%; display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+            .time-label { font-size: 11px; color: #aaa; width: 35px; text-align: center; font-family: monospace; }
+            .volume-container { width: 70%; margin: 15px auto; display: flex; align-items: center; gap: 15px; }
+            .volume-icon { color: #aaa; font-size: 14px; }
 
-            /* MINIMAL AUDIO CONTROL MATRIX */
-            .controls {
-                display: flex;
-                justify-content: center;
-                gap: 24px;
-                align-items: center;
-            }
-            .ctrl-btn {
-                background: none;
-                border: none;
-                color: #9ca3af;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .ctrl-btn:hover { color: #ffffff; }
-            .btn-main {
-                width: 64px;
-                height: 64px;
-                background: #ffffff;
-                color: #0b0b0f;
-                border-radius: 50%;
-                font-size: 22px;
-                box-shadow: 0 10px 25px rgba(255, 255, 255, 0.15);
-            }
-            .btn-main:hover {
-                transform: scale(1.05);
-                background: #f3f4f6;
-            }
-            .btn-sec { font-size: 20px; }
+            /* CONTROLS */
+            .controls { display: flex; justify-content: center; gap: 30px; align-items: center; margin-top: 5px; }
+            .ctrl-btn { background: none; border: none; color: white; cursor: pointer; filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.3)); }
+            .btn-main { width: 70px; height: 70px; background: linear-gradient(135deg, #ff0055, #ff3377); border-radius: 50%; font-size: 28px; box-shadow: 0 5px 20px rgba(255, 0, 85, 0.4); }
+            .btn-sec { font-size: 26px; color: #ccc; }
 
-            /* INPUT TEXT FIELDS & BUTTONS */
-            input[type="text"] {
-                width: 100%;
-                padding: 14px 18px;
-                background: rgba(255, 255, 255, 0.04);
-                border: 1px solid rgba(255, 255, 255, 0.06);
-                color: white;
-                border-radius: 16px;
-                font-size: 15px;
-                font-family: inherit;
-                outline: none;
-            }
-            input[type="text"]:focus {
-                border-color: #6366f1;
-                background: rgba(255, 255, 255, 0.07);
-            }
-            .btn {
-                width: 100%;
-                padding: 14px;
-                background: #6366f1;
-                color: white;
-                border: none;
-                border-radius: 16px;
-                font-weight: 600;
-                font-size: 15px;
-                font-family: inherit;
-                cursor: pointer;
-                box-shadow: 0 4px 20px rgba(99, 102, 241, 0.25);
-            }
-            .btn:hover { background: #4f46e5; }
+            /* NAV & INPUTS */
+            .nav { display: flex; justify-content: space-around; background: rgba(15, 15, 15, 0.9); backdrop-filter: blur(15px); padding: 15px; padding-bottom: 25px; position: fixed; bottom: 0; width: 100%; border-top: 1px solid #333; z-index: 1000; }
+            .nav button { background: none; border: none; color: #555; font-size: 22px; width: 100%; transition: 0.3s; cursor: pointer; }
+            .nav button.active { color: #ff0055; transform: translateY(-3px); filter: drop-shadow(0 0 5px #ff0055); }
 
-            /* SEARCH / QUEUE ITEM BLOCKS */
-            .result-item {
-                display: flex;
-                align-items: center;
-                background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.04);
-                margin-top: 12px;
-                padding: 12px;
-                border-radius: 16px;
-            }
-            .result-item img {
-                width: 48px;
-                height: 48px;
-                border-radius: 10px;
-                margin-right: 16px;
-                object-fit: cover;
-            }
-            .result-info {
-                flex-grow: 1;
-                overflow: hidden;
-            }
-            .result-info div {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            .add-btn {
-                background: rgba(255, 255, 255, 0.06);
-                border: none;
-                color: white;
-                width: 32px;
-                height: 32px;
-                border-radius: 50%;
-                cursor: pointer;
-                font-weight: bold;
-            }
-            .add-btn:hover { background: #6366f1; }
+            input[type="text"] { width: 100%; padding: 15px; background: #222; border: 1px solid #333; color: white; border-radius: 12px; font-size: 16px; outline: none; }
+            .btn { width: 100%; padding: 12px; background: #ff0055; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 16px; margin-top: 10px; cursor: pointer; }
 
-            /* CHAT MATRIX PANEL */
-            #chat-box {
-                flex-grow: 1;
-                overflow-y: auto;
-                background: rgba(255, 255, 255, 0.02);
-                border: 1px solid rgba(255, 255, 255, 0.04);
-                padding: 16px;
-                border-radius: 16px;
-                height: 52vh;
-                margin-bottom: 12px;
-            }
-            .msg {
-                margin-bottom: 10px;
-                font-size: 14px;
-                line-height: 1.5;
-            }
-            .msg b { color: #818cf8; }
-
-            /* FLOATING ISLAND NAVIGATION MENU */
-            .nav {
-                display: flex;
-                justify-content: space-around;
-                background: rgba(15, 15, 22, 0.7);
-                backdrop-filter: blur(20px);
-                padding: 10px;
-                position: fixed;
-                bottom: 24px;
-                left: 50%;
-                transform: translateX(-50%);
-                width: calc(100% - 48px);
-                max-width: 400px;
-                border-radius: 28px;
-                border: 1px solid rgba(255, 255, 255, 0.06);
-                box-shadow: 0 20px 45px rgba(0, 0, 0, 0.8);
-                z-index: 1000;
-            }
-            .nav button {
-                background: none;
-                border: none;
-                color: #4b5563;
-                font-size: 18px;
-                padding: 12px;
-                border-radius: 20px;
-                cursor: pointer;
-                width: 50px;
-                height: 50px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-            .nav button.active {
-                color: #6366f1;
-                background: rgba(99, 102, 241, 0.1);
-            }
+            .result-item { display: flex; align-items: center; background: #1a1a1a; margin-top: 10px; padding: 10px; border-radius: 12px; }
+            .result-item img { width: 50px; height: 50px; border-radius: 8px; margin-right: 15px; object-fit: cover; }
+            .result-info { flex-grow: 1; overflow: hidden; }
+            .add-btn { background: #ff0055; border: none; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+            #chat-box { flex-grow: 1; overflow-y: scroll; background: #111; padding: 10px; border-radius: 12px; height: 50vh; }
+            .msg { margin-bottom: 8px; font-size: 14px; }
         </style>
     </head>
     <body>
         <div id="ambient-light"></div>
 
         <div id="login-overlay">
-            <div style="text-align: center; margin-bottom: 10px;">
-                <h2>AudioX</h2>
-                <p style="color: #6b7280; font-size: 14px; margin: 0;">Stream music together in background sync</p>
-            </div>
+            <h2 style="color: #ff0055; text-shadow: 0 0 10px rgba(255, 0, 85, 0.5)">Join a Room</h2>
             <input type="text" id="usernameInput" placeholder="Your Name" />
-            <input type="text" id="roomInput" value="PARTY" placeholder="Room Code (e.g. PARTY)" style="margin-top: 4px;" />
-            <button class="btn" style="width: 80%; margin-top: 10px;" onclick="joinRoom()">Join Room</button>
+            <input type="text" id="roomInput" placeholder="Room Code (e.g. PARTY)" style="margin-top: 10px" />
+            <button class="btn" style="width: 70%; box-shadow: 0 5px 15px rgba(255, 0, 85, 0.3)" onclick="joinRoom()">Join</button>
         </div>
 
         <div id="page-player" class="page active">
-            <div id="room-tag">
-                Room &bull; <span id="room-name-display">...</span>
+            <div id="room-tag">ROOM: <span id="room-name-display">...</span></div>
+            <div class="mode-switch">
+                <button class="mode-btn active" onclick="setMode('audio')">Audio</button>
+                <button class="mode-btn" onclick="setMode('video')">Video</button>
             </div>
-
-            <audio id="audio-engine" preload="auto" crossorigin="anonymous"></audio>
+            <div id="video-container"><div id="player"></div></div>
             <div id="album-art-container"><div id="album-art"></div></div>
-
             <div id="song-info">
-                <div id="current-title">Waiting for DJ...</div>
-                <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">
-                    Added by: <span id="added-by" style="color: #9ca3af;">System</span>
-                </div>
+                <div id="current-title">Loading...</div>
+                <div style="font-size: 12px; color: #ccc">Added by: <span id="added-by">System</span></div>
             </div>
-
             <div class="timeline-container">
                 <span class="time-label" id="time-current">0:00</span>
                 <input type="range" id="seek-bar" value="0" min="0" max="100" onchange="seekSong()" oninput="isDragging=true" />
                 <span class="time-label" id="time-total">0:00</span>
             </div>
-
             <div class="controls">
-                <button class="ctrl-btn btn-sec" onclick="clearCurrentSong()">
-                    <i class="fa-solid fa-backward-step"></i>
-                </button>
-                <button class="ctrl-btn btn-main" onclick="togglePlay()">
-                    <i id="play-icon" class="fa fa-play" style="margin-left: 2px;"></i>
-                </button>
-                <button class="ctrl-btn btn-sec" onclick="popQueue()">
-                    <i class="fa-solid fa-forward-step"></i>
-                </button>
+                <button class="ctrl-btn btn-sec" onclick="triggerPrevTrack()"><i class="fa fa-backward"></i></button>
+                <button class="ctrl-btn btn-main" onclick="togglePlay()"><i id="play-icon" class="fa fa-play"></i></button>
+                <button class="ctrl-btn btn-sec" onclick="triggerSkipTrack()"><i class="fa fa-forward"></i></button>
             </div>
-
             <div class="volume-container">
-                <i class="fa fa-volume-off volume-icon"></i>
+                <i class="fa fa-volume-down volume-icon"></i>
                 <input type="range" id="volume-slider" min="0" max="100" value="100" oninput="changeVolume()" />
-                <i class="fa fa-volume-up volume-icon" style="color: #9ca3af"></i>
+                <i class="fa fa-volume-up volume-icon" style="color: #fff"></i>
             </div>
         </div>
 
         <div id="page-search" class="page">
-            <h2>Search Open Networks</h2>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="searchQuery" placeholder="Search direct tracks on Audius..." />
-                <button class="btn" style="width: auto; padding: 0 24px;" onclick="searchTracks()">Find</button>
-            </div>
-            <div id="search-results" style="margin-top: 15px;"></div>
+            <h2>Track URL Loader</h2>
+            <input type="text" id="streamUrlInput" placeholder="Paste direct YouTube Video ID (e.g., dQw4w9WgXcQ)" />
+            <button class="btn" onclick="loadDirectId()">Load Track</button>
         </div>
 
         <div id="page-queue" class="page">
-            <h2>Upcoming Queue</h2>
-            <div id="queue-list"></div>
+            <h2>Queue</h2>
+            <div id="queue-list"><p style='text-align:center;color:#666'>Queue Empty</p></div>
         </div>
 
         <div id="page-chat" class="page">
-            <h2>Room Chat</h2>
+            <h2>Chat</h2>
             <div id="chat-box"></div>
-            <div style="display: flex; gap: 8px;">
-                <input type="text" id="chatInput" placeholder="Write a message..." />
-                <button class="btn" style="width: auto; padding: 0 20px;" onclick="sendChat()"><i class="fa fa-paper-plane"></i></button>
-            </div>
+            <input type="text" id="chatInput" placeholder="Message..." />
+            <button class="btn" onclick="sendChat()">Send</button>
         </div>
 
         <div class="nav">
@@ -445,122 +152,124 @@
             <button onclick="switchTab('chat', this)"><i class="fa fa-comment"></i></button>
         </div>
 
-       <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
         <script src="https://www.youtube.com/iframe_api"></script>
+        
         <script>
+            // --- CONFIGURATION ---
             const SUPABASE_URL = "https://dizwcmqkywfcranpvxhk.supabase.co";
-            const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpendjbXFreXdmY3JhbnB2eGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTczNDgsImV4cCI6MjA5Nzg5MzM0OH0.ZOiSiNv7KjhlfFOcCPfmksnEkyIfFSkVTbF1sVW-mdEe";
-            
-            const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            
-            // Public open alternative YouTube API instance for free searching
-            const INVIDIOUS_SEARCH_API = "https://invidious.flokinet.to/api/v1/search";
+            const SUPABASE_ANON_KEY= "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRpendjbXFreXdmY3JhbnB2eGhrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMTczNDgsImV4cCI6MjA5Nzg5MzM0OH0.ZOiSiNv7KjhlfFOcCPfmksnEkyIfFSkVTbF1sVW-mdEe";
+            const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
             var player;
-            var myName = "", myRoom = "", isDragging = false;
+            var myName = "";
+            var myRoom = "";
+            var isDragging = false;
+            var roomChannel;
+            
+            // Central memory state structure representing your old room configuration object
+            var localState = {
+                currentSong: { videoId: "", title: "No Track Loaded", addedBy: "System" },
+                queue: [],
+                isPlaying: false
+            };
 
+            // --- KEYBOARD LISTENERS ---
             document.addEventListener("keydown", (e) => {
                 const active = document.activeElement;
                 const isInput = active.tagName === "INPUT";
-                if (e.code === "Space" && !isInput) { e.preventDefault(); togglePlay(); }
+                if (e.code === "Space" && !isInput) {
+                    e.preventDefault();
+                    togglePlay();
+                }
                 if (e.code === "Enter") {
-                    if (active.id === "searchQuery") searchTracks();
-                    else if (active.id === "chatInput") sendChat();
+                    if (active.id === "chatInput") sendChat();
                     else if (document.getElementById("login-overlay").style.display !== "none") joinRoom();
                 }
             });
 
-            // Initialize YouTube Iframe Player
-            function onYouTubeIframeAPIReady() {
-                player = new YT.Player("album-art", { // Mounts directly inside your artwork container
-                    height: "100%", width: "100%", videoId: "",
-                    playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1 },
-                    events: { onStateChange: onPlayerStateChange },
-                });
+            function setMode(mode) {
+                document.getElementById("video-container").style.display = mode === "video" ? "block" : "none";
+                document.getElementById("album-art-container").style.display = mode === "audio" ? "block" : "none";
+                document.querySelectorAll(".mode-btn").forEach((b, i) => b.classList.toggle("active", (mode === 'video' && i === 1) || (mode === 'audio' && i === 0)));
             }
 
-            function onPlayerStateChange(event) {
-                if (event.data == YT.PlayerState.ENDED) popQueue();
-            }
-
-            async function joinRoom() {
+            // --- REALTIME SYNC HANDSHAKE ENGINE ---
+            function joinRoom() {
                 var u = document.getElementById("usernameInput").value.trim();
                 var r = document.getElementById("roomInput").value.trim().toUpperCase();
-                if (!u || !r) return alert("Please fill out both details to connect.");
-                
-                myName = u; myRoom = r;
-                document.getElementById("login-overlay").style.display = "none";
-                document.getElementById("room-name-display").innerText = r;
+                if (u && r) {
+                    myName = u;
+                    myRoom = r;
+                    document.getElementById("login-overlay").style.display = "none";
+                    document.getElementById("room-name-display").innerText = r;
 
-                try {
-                    await _supabase.from('rooms').upsert({ room_code: r }, { onConflict: 'room_code' });
-                } catch(err) {
-                    console.log("Room initialization handled.");
+                    // Initialize the Broadcast Channel
+                    roomChannel = supabaseClient.channel(`room_${r}`, {
+                        config: { broadcast: { self: true } }
+                    });
+
+                    roomChannel
+                        .on('broadcast', { event: 'sync' }, (payload) => {
+                            handleIncomingSync(payload.payload);
+                        })
+                        .on('broadcast', { event: 'chat' }, (payload) => {
+                            appendChatMessage(payload.payload);
+                        })
+                        .subscribe((status) => {
+                            if (status === 'SUBSCRIBED') {
+                                broadcastAction('request_state', {});
+                                broadcastAction('chat', { user: "System", text: `${u} joined!` });
+                            }
+                        });
+                } else {
+                    alert("Please enter Name and Room Code!");
                 }
-
-                syncInitialRoomState();
-                fetchQueue();
-                fetchChatHistory();
-
-                _supabase.channel(`room:${r}`)
-                    .on('postgres_changes', { event: 'UPDATE', filter: `room_code=eq.${r}`, schema: 'public', table: 'rooms' }, payload => {
-                        processPlaybackSync(payload.new);
-                    })
-                    .on('postgres_changes', { event: '*', filter: `room_code=eq.${r}`, schema: 'public', table: 'queue' }, () => {
-                        fetchQueue();
-                    })
-                    .on('postgres_changes', { event: 'INSERT', filter: `room_code=eq.${r}`, schema: 'public', table: 'messages' }, payload => {
-                        renderSingleMessage(payload.new);
-                    })
-                    .subscribe();
             }
 
-            async function syncInitialRoomState() {
-                let { data } = await _supabase.from('rooms').select('*').eq('room_code', myRoom).maybeSingle();
-                if (data) processPlaybackSync(data);
+            function broadcastAction(event, payload) {
+                if (roomChannel) {
+                    roomChannel.send({ type: 'broadcast', event: event, payload: payload });
+                }
             }
 
-            function processPlaybackSync(room) {
-                document.getElementById("current-title").innerText = room.current_title || "Waiting for DJ...";
-                document.getElementById("added-by").innerText = room.added_by || "System";
-
-                if (room.current_stream_url) { // Holding the YouTube video ID
-                    const targetVideoId = room.current_stream_url;
+            function handleIncomingSync(data) {
+                if (data.action === "state_update" || data.action === "initial_state") {
+                    localState = data.state;
+                    updateUIDisplay(localState.currentSong);
+                    updateQueueUI(localState.queue);
                     
-                    if (player && player.loadVideoById) {
-                        if (player.getVideoData().video_id !== targetVideoId) {
-                            player.loadVideoById(targetVideoId, room.seek_time || 0);
-                        }
-                        
-                        if (Math.abs(player.getCurrentTime() - room.seek_time) > 2.5) {
-                            player.seekTo(room.seek_time);
-                        }
-
-                        if (room.is_playing) {
-                            player.playVideo();
-                            updatePlayIcons(true);
-                        } else {
-                            player.pauseVideo();
-                            updatePlayIcons(false);
+                    if (localState.currentSong.videoId && player && player.loadVideoById) {
+                        if (player.getVideoData().video_id !== localState.currentSong.videoId) {
+                            player.loadVideoById(localState.currentSong.videoId, data.time || 0);
                         }
                     }
+                    
+                    if (localState.isPlaying) {
+                        if (data.time && Math.abs(player.getCurrentTime() - data.time) > 3) player.seekTo(data.time);
+                        player.playVideo();
+                        updatePlayIcon(true);
+                    } else {
+                        player.pauseVideo();
+                        updatePlayIcon(false);
+                    }
+                }
+                else if (data.action === "request_state" && localState.currentSong.videoId) {
+                    // Existing users answer new users with current state configuration
+                    broadcastAction('sync', {
+                        action: 'initial_state',
+                        state: localState,
+                        time: player.getCurrentTime()
+                    });
                 }
             }
 
-            async function togglePlay() {
-                if (!player || !player.getCurrentTime) return;
-                let { data: room } = await _supabase.from('rooms').select('is_playing').eq('room_code', myRoom).single();
-                if(!room) return;
-                await _supabase.from('rooms').update({ 
-                    is_playing: !room.is_playing,
-                    seek_time: player.getCurrentTime()
-                }).eq('room_code', myRoom);
-            }
-
-            async function seekSong() {
-                var slider = document.getElementById("seek-bar");
-                await _supabase.from('rooms').update({ seek_time: parseFloat(slider.value) }).eq('room_code', myRoom);
-                isDragging = false;
+            function onYouTubeIframeAPIReady() {
+                player = new YT.Player("player", {
+                    height: "100%", width: "100%", videoId: "",
+                    playerVars: { autoplay: 1, controls: 0, disablekb: 1, playsinline: 1 },
+                    events: { onStateChange: (e) => { if (e.data == YT.PlayerState.ENDED) triggerSkipTrack(); } }
+                });
             }
 
             function changeVolume() {
@@ -568,19 +277,105 @@
                 if (player && player.setVolume) player.setVolume(vol);
             }
 
-            setInterval(async () => {
-                if (player && player.getCurrentTime && player.getPlayerState() === YT.PlayerState.PLAYING && !isDragging) {
+            function loadDirectId() {
+                var id = document.getElementById("streamUrlInput").value.trim();
+                if (id) {
+                    localState.currentSong = { videoId: id, title: "Streaming Video: " + id, addedBy: myName };
+                    localState.isPlaying = true;
+                    broadcastAction('sync', { action: 'state_update', state: localState, time: 0 });
+                    switchTab('player', document.querySelectorAll(".nav button")[0]);
+                }
+            }
+
+            function togglePlay() {
+                localState.isPlaying = !localState.isPlaying;
+                broadcastAction('sync', {
+                    action: 'state_update',
+                    state: localState,
+                    time: player.getCurrentTime()
+                });
+            }
+
+            function seekSong() {
+                var slider = document.getElementById("seek-bar");
+                broadcastAction('sync', {
+                    action: 'state_update',
+                    state: localState,
+                    time: parseFloat(slider.value)
+                });
+                isDragging = false;
+            }
+
+            function triggerSkipTrack() {
+                if (localState.queue.length > 0) {
+                    var nextTrack = localState.queue.shift();
+                    localState.currentSong = { videoId: nextTrack.videoId, title: nextTrack.title, addedBy: nextTrack.user };
+                    localState.isPlaying = true;
+                    broadcastAction('sync', { action: 'state_update', state: localState, time: 0 });
+                } else {
+                    alert("Queue Empty!");
+                }
+            }
+
+            function triggerPrevTrack() {
+                broadcastAction('sync', { action: 'state_update', state: localState, time: 0 });
+            }
+
+            function req(id, title, thumb) {
+                var trackObj = { videoId: id, title: title, user: myName, thumbnail: thumb };
+                if (!localState.isPlaying && localState.queue.length === 0) {
+                    localState.currentSong = { videoId: id, title: title, addedBy: myName };
+                    localState.isPlaying = true;
+                    broadcastAction('sync', { action: 'state_update', state: localState, time: 0 });
+                } else {
+                    localState.queue.push(trackObj);
+                    broadcastAction('sync', { action: 'state_update', state: localState, time: player.getCurrentTime() });
+                    broadcastAction('chat', { user: "System", text: `${myName} added "${title}"` });
+                }
+                alert("Added!");
+                switchTab("queue", document.querySelectorAll(".nav button")[2]);
+            }
+
+            // --- DISPLAY LOGIC MANAGERS ---
+            function updateUIDisplay(song) {
+                document.getElementById("current-title").innerText = song.title || "No Track Loaded";
+                document.getElementById("added-by").innerText = song.addedBy || "System";
+                if (song.thumbnail) {
+                    document.getElementById("album-art").style.backgroundImage = `url('${song.thumbnail}')`;
+                }
+            }
+
+            function updateQueueUI(q) {
+                const div = document.getElementById("queue-list");
+                div.innerHTML = q.length ? "" : "<p style='text-align:center;color:#666'>Queue Empty</p>";
+                q.forEach((i) => {
+                    div.innerHTML += `<div class="result-item" style="border-left:3px solid #ff0055"><div class="result-info"><div>${i.title}</div><div style="font-size:11px;color:#ff0055">${i.user}</div></div></div>`;
+                });
+            }
+
+            function sendChat() {
+                const i = document.getElementById("chatInput");
+                if (i.value) {
+                    broadcastAction('chat', { user: myName, text: i.value });
+                    i.value = "";
+                }
+            }
+
+            function appendChatMessage(msg) {
+                const b = document.getElementById("chat-box");
+                b.innerHTML += `<div class="msg"><b>${msg.user}:</b> ${msg.text}</div>`;
+                b.scrollTop = b.scrollHeight;
+            }
+
+            setInterval(() => {
+                if (player && player.getCurrentTime && !isDragging) {
                     var current = player.getCurrentTime();
-                    var duration = player.getDuration() || 0;
+                    var duration = player.getDuration();
                     if (duration > 0) {
                         document.getElementById("seek-bar").max = duration;
                         document.getElementById("seek-bar").value = current;
                         document.getElementById("time-current").innerText = formatTime(current);
                         document.getElementById("time-total").innerText = formatTime(duration);
-                    }
-                    
-                    if (document.getElementById("added-by").innerText === myName) {
-                        await _supabase.from('rooms').update({ seek_time: current }).eq('room_code', myRoom);
                     }
                 }
             }, 1000);
@@ -590,108 +385,11 @@
                 return m + ":" + (sec < 10 ? "0" : "") + sec;
             }
 
-            function updatePlayIcons(playing) {
+            function updatePlayIcon(isPlaying) {
                 const icon = document.getElementById("play-icon");
-                icon.className = playing ? "fa fa-pause" : "fa fa-play";
-            }
-
-            // FREE OPEN YOUTUBE SEARCH METHOD VIA INVIDIOUS API INSTANCE
-            function searchTracks() {
-                const q = document.getElementById("searchQuery").value;
-                const div = document.getElementById("search-results");
-                div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>Searching YouTube networks...</p>";
-                
-                fetch(`${INVIDIOUS_SEARCH_API}?q=${encodeURIComponent(q)}&type=video`)
-                    .then(res => res.json())
-                    .then(videos => {
-                        div.innerHTML = "";
-                        if (!videos || !videos.length) {
-                            div.innerHTML = "<p style='text-align:center;color:#6b7280;font-size:14px;margin-top:20px;'>No clear matches found.</p>";
-                            return;
-                        }
-                        videos.slice(0, 6).forEach(v => {
-                            const videoId = v.videoId;
-                            const img = (v.videoThumbnails && v.videoThumbnails[0]) ? v.videoThumbnails[0].url : 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500';
-                            const titleClean = v.title.replace(/'/g, "").replace(/"/g, "");
-                            div.innerHTML += `
-                            <div class="result-item">
-                                <img src="${img}">
-                                <div class="result-info"><div style="font-weight:600;font-size:14px;">${titleClean}</div></div>
-                                <button class="add-btn" onclick="addTrackToQueue('${videoId}', '${titleClean}', '${img}')">+</button>
-                            </div>`;
-                        });
-                    }).catch(() => {
-                        div.innerHTML = "<p style='text-align:center;color:#ef4444;'>Search platform connection timed out.</p>";
-                    });
-            }
-
-            async function addTrackToQueue(id, title, thumb) {
-                await _supabase.from('queue').insert({ room_code: myRoom, title: title, stream_url: id, thumbnail: thumb, requested_by: myName });
-                alert("Track queued!");
-                
-                let { data: room } = await _supabase.from('rooms').select('current_stream_url').eq('room_code', myRoom).maybeSingle();
-                if (!room || !room.current_stream_url) {
-                    popQueue();
-                }
-                switchTab("queue", document.querySelectorAll(".nav button")[2]);
-            }
-
-            async function fetchQueue() {
-                let { data } = await _supabase.from('queue').select('*').eq('room_code', myRoom).order('created_at', { ascending: true });
-                const div = document.getElementById("queue-list");
-                div.innerHTML = data && data.length ? "" : "<p style='text-align:center;color:#4b5563;font-size:14px;margin-top:20px;'>The queue is empty.</p>";
-                if(data) {
-                    data.forEach(i => {
-                        div.innerHTML += `
-                        <div class="result-item" style="border-left: 2px solid #6366f1;">
-                            <div class="result-info">
-                                <div style="font-weight:500;font-size:14px;">${i.title}</div>
-                                <div style="font-size:11px;color:#818cf8;margin-top:2px;">Requested by ${i.requested_by}</div>
-                            </div>
-                        </div>`;
-                    });
-                }
-            }
-
-            async function popQueue() {
-                let { data } = await _supabase.from('queue').select('*').eq('room_code', myRoom).order('created_at', { ascending: true }).limit(1);
-                if (data && data.length > 0) {
-                    const next = data[0];
-                    await _supabase.from('rooms').update({
-                        current_title: next.title,
-                        current_stream_url: next.stream_url,
-                        current_thumbnail: next.thumbnail,
-                        added_by: next.requested_by,
-                        is_playing: true,
-                        seek_time: 0.0
-                    }).eq('room_code', myRoom);
-                    await _supabase.from('queue').delete().eq('id', next.id);
-                } else {
-                    clearCurrentSong();
-                }
-            }
-
-            async function clearCurrentSong() {
-                await _supabase.from('rooms').update({ current_title: "Waiting for DJ...", current_stream_url: null, is_playing: false, seek_time: 0.0, added_by: 'System' }).eq('room_code', myRoom);
-            }
-
-            async function sendChat() {
-                const i = document.getElementById("chatInput");
-                if (!i.value) return;
-                await _supabase.from('messages').insert({ room_code: myRoom, username: myName, message_text: i.value });
-                i.value = "";
-            }
-
-            async function fetchChatHistory() {
-                let { data } = await _supabase.from('messages').select('*').eq('room_code', myRoom).order('created_at', { ascending: true }).limit(50);
-                document.getElementById("chat-box").innerHTML = "";
-                if (data) data.forEach(m => renderSingleMessage(m));
-            }
-
-            function renderSingleMessage(m) {
-                const b = document.getElementById("chat-box");
-                b.innerHTML += `<div class="msg"><b>${m.username}:</b> ${m.message_text}</div>`;
-                b.scrollTop = b.scrollHeight;
+                const art = document.getElementById("album-art");
+                icon.className = isPlaying ? "fa fa-pause" : "fa fa-play";
+                art.style.animationPlayState = isPlaying ? "running" : "paused";
             }
 
             function switchTab(t, btn) {
